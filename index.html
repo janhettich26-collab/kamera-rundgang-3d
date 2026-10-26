@@ -262,25 +262,40 @@ const man = new THREE.Group();                                 // Männchen 1,75
   const head = new THREE.Mesh(new THREE.SphereGeometry(.12, 16, 12), sk); head.position.y = 1.62;
   man.add(legs, body, head); man.traverse(o => o.layers.set(1)); scene.add(man); }
 const pcam = new THREE.PerspectiveCamera(50, 16 / 9, .15, 120); pcam.layers.enable(1);
-localStorage.removeItem('meineKameras');
-let mine = JSON.parse(localStorage.getItem('kameras_v2') || '[]'), edit = null;
-const mineGroup = new THREE.Group(); scene.add(mineGroup);
+localStorage.removeItem('meineKameras'); localStorage.removeItem('kameras_v2');
+let mine = JSON.parse(localStorage.getItem('kameras_v3') || 'null') || JSON.parse(JSON.stringify(D.startcams || [])), edit = null;
+const COL = c => c.src === 'jan' ? 0xF5C518 : 0xD61E28, COLS = c => c.src === 'jan' ? '#F5C518' : '#D61E28';
+const mineGroup = new THREE.Group(); scene.add(mineGroup); window.__mg = mineGroup;
 function frustum(c, color, op) {
-  const g = new THREE.Group(), H = (c.hk ? fovV(c.f) : fovH(c.f)) * Math.PI / 360, V = (c.hk ? fovH(c.f) : fovV(c.f)) * Math.PI / 360;
-  const o = new THREE.Vector3(c.x, c.h, c.z), fw = new THREE.Vector3(Math.cos(c.yaw) * Math.cos(-c.tilt), Math.sin(-c.tilt), Math.sin(c.yaw) * Math.cos(-c.tilt));
-  const rt = new THREE.Vector3(-Math.sin(c.yaw), 0, Math.cos(c.yaw)), up = new THREE.Vector3().crossVectors(rt, fw).normalize();
-  const pts = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => { const d = fw.clone().addScaledVector(rt, a * Math.tan(H)).addScaledVector(up, b * Math.tan(V)).normalize();
-    const t = d.y < -1e-3 ? Math.min(-c.h / d.y, 30) : 30; return o.clone().addScaledVector(d, t); });
-  const pos = []; for (let i = 0; i < 4; i++) { const a = pts[i], b = pts[(i + 1) % 4]; pos.push(o.x, o.y, o.z, a.x, a.y, a.z, b.x, b.y, b.z); }
-  const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
-  g.add(new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: op, side: THREE.DoubleSide, depthWrite: false })));
-  const ln = []; for (const p of pts) ln.push(o, p); for (let i = 0; i < 4; i++) ln.push(pts[i], pts[(i + 1) % 4]);
-  g.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(ln), new THREE.LineBasicMaterial({ color })));
+  const g = new THREE.Group(), Hd = c.hk ? fovV(c.f) : fovH(c.f), H = Hd * Math.PI / 360, V = (c.hk ? fovH(c.f) : fovV(c.f)) * Math.PI / 360;
+  const rr = c.r || Math.min(20, (c.hk ? 1520 : 2688) / (125 * 2 * Math.tan(H)));   // Reichweite: Plan bzw. „Erkennen“ 125 px/m
   const body = new THREE.Mesh(new THREE.SphereGeometry(.17, 20, 10, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0xffffff }));
-  body.position.copy(o); g.add(body); return g;
+  body.position.set(c.x, c.h, c.z); g.add(body);
+  const lens = new THREE.Mesh(new THREE.SphereGeometry(.07, 12, 6), new THREE.MeshBasicMaterial({ color: 0x111111 })); lens.position.set(c.x + Math.cos(c.yaw) * .08, c.h - .1, c.z + Math.sin(c.yaw) * .08); g.add(lens);
+  // Sichtfächer am Boden
+  const N = 24, fan = [new THREE.Vector2(c.x, -c.z)];
+  for (let i = 0; i <= N; i++) { const t = c.yaw - H + 2 * H * i / N; fan.push(new THREE.Vector2(c.x + Math.cos(t) * rr, -(c.z + Math.sin(t) * rr))); }
+  const fg = new THREE.ShapeGeometry(new THREE.Shape(fan)); fg.rotateX(-Math.PI / 2);
+  const edit = op >= .18, ff = new THREE.Mesh(fg, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: edit ? .32 : .17, depthWrite: false, side: THREE.DoubleSide }));
+  ff.position.y = .025; ff.renderOrder = 2; g.add(ff);
+  const ol = fan.map(v => new THREE.Vector3(v.x, .03, -v.y)); ol.push(ol[0]);
+  g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints(ol), new THREE.LineBasicMaterial({ color, transparent: true, opacity: edit ? 1 : .7 })));
+  g.add(new THREE.Line(new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(c.x, c.h, c.z), new THREE.Vector3(c.x, .03, c.z)]), new THREE.LineBasicMaterial({ color, transparent: true, opacity: .35 })));
+  if (edit) { // volle 3D-Pyramide nur beim Bearbeiten
+    const o = new THREE.Vector3(c.x, c.h, c.z), fw = new THREE.Vector3(Math.cos(c.yaw) * Math.cos(-c.tilt), Math.sin(-c.tilt), Math.sin(c.yaw) * Math.cos(-c.tilt));
+    const rt = new THREE.Vector3(-Math.sin(c.yaw), 0, Math.cos(c.yaw)), up = new THREE.Vector3().crossVectors(rt, fw).normalize();
+    const pts = [[-1, -1], [1, -1], [1, 1], [-1, 1]].map(([a, b]) => { const d = fw.clone().addScaledVector(rt, a * Math.tan(H)).addScaledVector(up, b * Math.tan(V)).normalize();
+      const t = d.y < -1e-3 ? Math.min(-c.h / d.y, rr * 1.2) : rr * 1.2; return o.clone().addScaledVector(d, t); });
+    const pos = []; for (let i = 0; i < 4; i++) { const a = pts[i], b = pts[(i + 1) % 4]; pos.push(o.x, o.y, o.z, a.x, a.y, a.z, b.x, b.y, b.z); }
+    const geo = new THREE.BufferGeometry(); geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+    const fm = new THREE.Mesh(geo, new THREE.MeshBasicMaterial({ color, transparent: true, opacity: .14, side: THREE.DoubleSide, depthWrite: false })); fm.renderOrder = 3; g.add(fm);
+    const ln = []; for (const p of pts) ln.push(o, p); for (let i = 0; i < 4; i++) ln.push(pts[i], pts[(i + 1) % 4]);
+    g.add(new THREE.LineSegments(new THREE.BufferGeometry().setFromPoints(ln), new THREE.LineBasicMaterial({ color })));
+  }
+  return g;
 }
-function redrawMine() { mineGroup.clear(); mine.forEach((c, i) => { if (edit !== c) { const f = frustum(c, 0xD61E28, .12); mineGroup.add(f); const l = label('K' + String(i + 1).padStart(2, '0'), '#D61E28'); l.position.set(c.x, c.h + .7, c.z); mineGroup.add(l); } }); }
-function saveMine() { localStorage.setItem('kameras_v2', JSON.stringify(mine)); }
+function redrawMine() { mineGroup.clear(); mine.forEach((c, i) => { if (edit !== c) { const f = frustum(c, COL(c), .12); mineGroup.add(f); const l = label('K' + String(i + 1).padStart(2, '0'), COLS(c)); l.position.set(c.x, c.h + .7, c.z); mineGroup.add(l); } }); }
+function saveMine() { localStorage.setItem('kameras_v3', JSON.stringify(mine)); }
 function fillSel() { [...sel.querySelectorAll('option[data-e]')].forEach(o => o.remove());
   mine.forEach((c, i) => { const o = document.createElement('option'); o.value = 'E' + i; o.dataset.e = 1; o.textContent = `📷 K${String(i + 1).padStart(2, '0')} · ${String(c.f).replace('.', ',')} mm${c.hk ? ' · hochkant' : ''}`; sel.appendChild(o); }); }
 let editGroup = null;
@@ -291,7 +306,7 @@ function syncUI() { if (!edit) return; P('sf').value = edit.f; P('sh').value = e
   if (editGroup) scene.remove(editGroup); editGroup = frustum(edit, 0xFF7A3D, .2); scene.add(editGroup); }
 function openEdit(c, title) { edit = c; P('ptitle').textContent = title; panel.style.display = 'block'; pip.style.display = 'block'; P('stick').style.bottom = '250px'; setMode('walk'); redrawMine(); syncUI(); }
 function closeEdit() { edit = null; if (editGroup) scene.remove(editGroup); editGroup = null; panel.style.display = 'none'; pip.style.display = 'none'; P('stick').style.bottom = '70px'; redrawMine(); fillSel(); }
-P('place').onclick = () => { const c = { x: px, z: pz, h: 2.8, yaw, tilt: 25 * Math.PI / 180, f: 4, hk: false }; mine.push(c); saveMine(); openEdit(c, 'Neue Kamera K' + String(mine.length).padStart(2, '0')); };
+P('place').onclick = () => { const c = { x: px, z: pz, h: 2.8, yaw, tilt: 25 * Math.PI / 180, f: 4, hk: false, src: 'jan' }; mine.push(c); saveMine(); openEdit(c, 'Neue Kamera K' + String(mine.length).padStart(2, '0')); };
 P('sf').oninput = e => { edit.f = +e.target.value; syncUI(); }; P('sh').oninput = e => { edit.h = +e.target.value; syncUI(); };
 P('st').oninput = e => { edit.tilt = +e.target.value * Math.PI / 180; syncUI(); };
 P('rl').onclick = () => { edit.yaw -= Math.PI / 36; syncUI(); }; P('rr').onclick = () => { edit.yaw += Math.PI / 36; syncUI(); };
@@ -300,10 +315,10 @@ P('ok').onclick = () => { saveMine(); closeEdit(); }; P('del').onclick = () => {
 sel.addEventListener('change', () => { if (String(sel.value).startsWith('E')) { const c = mine[+sel.value.slice(1)]; sel.value = ''; openEdit(c, 'Kamera K' + String(mine.indexOf(c) + 1).padStart(2, '0')); } }, true);
 for (const id of ['panel', 'place']) for (const ev of ['touchstart', 'mousedown']) P(id).addEventListener(ev, e => e.stopPropagation());
 P('liste').onclick = () => { const r = mine.map((c, i) => { const H = Math.round(c.hk ? fovV(c.f) : fovH(c.f));
-    return `K${String(i + 1).padStart(2, '0')}  x=${c.x.toFixed(1)}  z=${c.z.toFixed(1)}  Höhe ${c.h.toFixed(1)} m  Richtung ${Math.round(((c.yaw * 180 / Math.PI) % 360 + 360) % 360)}°  Neigung ${Math.round(c.tilt * 180 / Math.PI)}°  ${c.f.toFixed(1)} mm  ${H}°${c.hk ? '  hochkant' : ''}`; }).join('\n');
+    return `K${String(i + 1).padStart(2, '0')} ${c.src === 'jan' ? '🟡' : '🔴'} ${c.name ? c.name + '  ' : ''}x=${c.x.toFixed(1)}  z=${c.z.toFixed(1)}  Höhe ${c.h.toFixed(1)} m  Richtung ${Math.round(((c.yaw * 180 / Math.PI) % 360 + 360) % 360)}°  Neigung ${Math.round(c.tilt * 180 / Math.PI)}°  ${c.f.toFixed(1)} mm  ${H}°${c.hk ? '  hochkant' : ''}`; }).join('\n');
   const t = `Kameraliste (${mine.length} Stück)\n` + (r || '– noch keine Kamera gesetzt –'); if (navigator.clipboard) navigator.clipboard.writeText(t).catch(() => {}); alert(t + '\n\n(ist kopiert – einfach in den Chat einfügen)'); };
 for (const ev of ['touchstart', 'mousedown']) P('liste').addEventListener(ev, e => e.stopPropagation());
-P('reset').onclick = () => { if (!confirm('Neustart: zurück zum Eingang und eigene Kameras löschen?')) return; localStorage.removeItem('kameras_v2'); location.reload(); };
+P('reset').onclick = () => { if (!confirm('Neustart: zurück zum Eingang und Kameras auf den Plan-Stand (gelb + rot) zurücksetzen?')) return; localStorage.removeItem('kameras_v3'); location.reload(); };
 for (const ev of ['touchstart', 'mousedown']) P('reset').addEventListener(ev, e => e.stopPropagation());
 redrawMine(); fillSel();
 window.__pip = () => {
@@ -330,7 +345,7 @@ const $ = id => document.getElementById(id), info = $('info');
 function setMode(m) { mode = m; $('walk').classList.toggle('on', m === 'walk'); $('top').classList.toggle('on', m === 'top'); $('stick').style.display = m === 'walk' ? 'block' : 'none'; }
 $('walk').onclick = () => { setMode('walk'); cam.fov = 70; cam.updateProjectionMatrix(); sel.value = ''; info.textContent = 'Links laufen · rechts umsehen'; };
 $('top').onclick = () => { setMode('top'); cam.fov = 50; cam.updateProjectionMatrix(); sel.value = ''; info.textContent = 'Draufsicht · wischen zum Verschieben · rote Kegel = Sichtfelder'; };
-$('cones').onclick = e => { coneGroup.visible = !coneGroup.visible; e.target.classList.toggle('on', coneGroup.visible); };
+$('cones').onclick = e => { coneGroup.visible = !coneGroup.visible; window.__mg && (window.__mg.visible = coneGroup.visible); e.target.classList.toggle('on', coneGroup.visible); };
 sel.onchange = () => {
   const c = D.cams.find(x => x.nr == sel.value); if (!c) return; setMode('cam');
   yaw = c.dir * Math.PI / 180; px = c.x + Math.cos(yaw) * .35; pz = c.z + Math.sin(yaw) * .35; pitch = -Math.atan2(c.h - 1.0, Math.min(c.r, 12) * .6);
