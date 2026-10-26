@@ -262,7 +262,8 @@ const man = new THREE.Group();                                 // Männchen 1,75
   const head = new THREE.Mesh(new THREE.SphereGeometry(.12, 16, 12), sk); head.position.y = 1.62;
   man.add(legs, body, head); man.traverse(o => o.layers.set(1)); scene.add(man); }
 const pcam = new THREE.PerspectiveCamera(50, 16 / 9, .15, 120); pcam.layers.enable(1);
-let mine = JSON.parse(localStorage.getItem('meineKameras') || '[]'), edit = null;
+localStorage.removeItem('meineKameras');
+let mine = JSON.parse(localStorage.getItem('kameras_v2') || '[]'), edit = null;
 const mineGroup = new THREE.Group(); scene.add(mineGroup);
 function frustum(c, color, op) {
   const g = new THREE.Group(), H = (c.hk ? fovV(c.f) : fovH(c.f)) * Math.PI / 360, V = (c.hk ? fovH(c.f) : fovV(c.f)) * Math.PI / 360;
@@ -279,7 +280,7 @@ function frustum(c, color, op) {
   body.position.copy(o); g.add(body); return g;
 }
 function redrawMine() { mineGroup.clear(); mine.forEach((c, i) => { if (edit !== c) { const f = frustum(c, 0xD61E28, .12); mineGroup.add(f); const l = label('K' + String(i + 1).padStart(2, '0'), '#D61E28'); l.position.set(c.x, c.h + .7, c.z); mineGroup.add(l); } }); }
-function saveMine() { localStorage.setItem('meineKameras', JSON.stringify(mine)); }
+function saveMine() { localStorage.setItem('kameras_v2', JSON.stringify(mine)); }
 function fillSel() { [...sel.querySelectorAll('option[data-e]')].forEach(o => o.remove());
   mine.forEach((c, i) => { const o = document.createElement('option'); o.value = 'E' + i; o.dataset.e = 1; o.textContent = `📷 K${String(i + 1).padStart(2, '0')} · ${String(c.f).replace('.', ',')} mm${c.hk ? ' · hochkant' : ''}`; sel.appendChild(o); }); }
 let editGroup = null;
@@ -302,7 +303,7 @@ P('liste').onclick = () => { const r = mine.map((c, i) => { const H = Math.round
     return `K${String(i + 1).padStart(2, '0')}  x=${c.x.toFixed(1)}  z=${c.z.toFixed(1)}  Höhe ${c.h.toFixed(1)} m  Richtung ${Math.round(((c.yaw * 180 / Math.PI) % 360 + 360) % 360)}°  Neigung ${Math.round(c.tilt * 180 / Math.PI)}°  ${c.f.toFixed(1)} mm  ${H}°${c.hk ? '  hochkant' : ''}`; }).join('\n');
   const t = `Kameraliste (${mine.length} Stück)\n` + (r || '– noch keine Kamera gesetzt –'); if (navigator.clipboard) navigator.clipboard.writeText(t).catch(() => {}); alert(t + '\n\n(ist kopiert – einfach in den Chat einfügen)'); };
 for (const ev of ['touchstart', 'mousedown']) P('liste').addEventListener(ev, e => e.stopPropagation());
-P('reset').onclick = () => { if (!confirm('Neustart: zurück zum Eingang und eigene Kameras löschen?')) return; localStorage.removeItem('meineKameras'); location.reload(); };
+P('reset').onclick = () => { if (!confirm('Neustart: zurück zum Eingang und eigene Kameras löschen?')) return; localStorage.removeItem('kameras_v2'); location.reload(); };
 for (const ev of ['touchstart', 'mousedown']) P('reset').addEventListener(ev, e => e.stopPropagation());
 redrawMine(); fillSel();
 window.__pip = () => {
