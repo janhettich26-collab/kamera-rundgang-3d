@@ -73,15 +73,31 @@ const woodT = new THREE.CanvasTexture(woodC); woodT.wrapS = woodT.wrapT = THREE.
 const woodMat = new THREE.MeshLambertMaterial({ color: 0xc99a62 }), capMat = new THREE.MeshLambertMaterial({ color: 0xd9d4ca });
 for (const w of D.building.walls) { extrude(w.ext, .12, sockMat, w.holes, 0); extrude(w.ext, 2.58, wallMat, w.holes, .12); extrude(w.ext, 1.26, woodMat, w.holes, 2.7); extrude(w.ext, .04, capMat, w.holes, 3.96); }
 for (const pl of D.building.pillars) { extrude(pl, .12, sockMat, [], 0); extrude(pl, 3.84, new THREE.MeshLambertMaterial({ color: 0xfaf9f6 }), [], .12); }
-const doorMat = new THREE.MeshLambertMaterial({ color: 0xf7f5f0 });
-for (const [hx, hz, ex, ez] of D.building.doors) { const L = Math.hypot(ex - hx, ez - hz), m = new THREE.Mesh(new THREE.BoxGeometry(L, 2.1, .04), doorMat);
-  m.position.set((hx + ex) / 2, 1.05, (hz + ez) / 2); m.rotation.y = -Math.atan2(ez - hz, ex - hx); scene.add(m);
-  const fr = new THREE.LineSegments(new THREE.EdgesGeometry(m.geometry), new THREE.LineBasicMaterial({ color: 0x777777 })); fr.position.copy(m.position); fr.rotation.copy(m.rotation); scene.add(fr); }
+// Türen: Zarge + geschlossenes Türblatt mit Griff (Lage aus Bauplan-Bögen)
+const doorMat = new THREE.MeshLambertMaterial({ color: 0xe9e6df }), frameMat = new THREE.MeshLambertMaterial({ color: 0x8c9096 }), handleMat = new THREE.MeshLambertMaterial({ color: 0x3a3d44 });
+for (const [hx, hz, cx, cz, L] of D.building.doors_closed) {
+  const ang = -Math.atan2(cz - hz, cx - hx), g = new THREE.Group(); g.position.set(hx, 0, hz); g.rotation.y = ang;
+  const leaf = new THREE.Mesh(new THREE.BoxGeometry(L - .04, 2.05, .045), doorMat); leaf.position.set(L / 2, 1.04, 0); g.add(leaf);
+  const top = new THREE.Mesh(new THREE.BoxGeometry(L + .06, .07, .2), frameMat); top.position.set(L / 2, 2.1, 0); g.add(top);
+  for (const xx of [-.03, L + .03]) { const p = new THREE.Mesh(new THREE.BoxGeometry(.06, 2.13, .2), frameMat); p.position.set(xx, 1.065, 0); g.add(p); }
+  for (const zz of [-.05, .05]) { const hd = new THREE.Mesh(new THREE.BoxGeometry(.14, .025, .025), handleMat); hd.position.set(L - .12, 1.05, zz); g.add(hd); }
+  scene.add(g);
+}
 function floorText(lines, x, z, size, color) { const c = document.createElement('canvas'); c.width = 1024; c.height = 256 * lines.length / 2 + 64; const g = c.getContext('2d');
   g.fillStyle = color; g.textAlign = 'center'; g.textBaseline = 'middle'; lines.forEach((t, i) => { g.font = (i ? '500 ' : 'bold ') + (i ? 78 : 96) + 'px Helvetica'; g.fillText(t, 512, 70 + i * 110); });
   const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
   const m = new THREE.Mesh(new THREE.PlaneGeometry(size, size * c.height / 1024), new THREE.MeshBasicMaterial({ map: t, transparent: true, depthWrite: false, polygonOffset: true, polygonOffsetFactor: -2, polygonOffsetUnits: -2 }));
   m.rotation.x = -Math.PI / 2; m.position.set(x, .012, z); m.renderOrder = 1; scene.add(m); return m; }
+function sign(txt, x, z, dir) {
+  const c = document.createElement('canvas'); c.width = 512; c.height = 128; const g = c.getContext('2d');
+  g.fillStyle = '#cc071e'; g.fillRect(0, 0, 512, 128); g.fillStyle = '#fff'; g.font = 'bold 54px Helvetica'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  let f = 54; while (g.measureText(txt).width > 480 && f > 26) { f -= 2; g.font = `bold ${f}px Helvetica`; } g.fillText(txt, 256, 66);
+  const t = new THREE.CanvasTexture(c); t.colorSpace = THREE.SRGBColorSpace; t.anisotropy = 4;
+  const m = new THREE.Mesh(new THREE.BoxGeometry(1.2, .3, .03), [new THREE.MeshLambertMaterial({ color: 0xcc071e }), new THREE.MeshLambertMaterial({ color: 0xcc071e }), new THREE.MeshLambertMaterial({ color: 0xcc071e }), new THREE.MeshLambertMaterial({ color: 0xcc071e }), new THREE.MeshBasicMaterial({ map: t }), new THREE.MeshBasicMaterial({ map: t })]);
+  m.position.set(x, 2.45, z); if (dir === 'z') m.rotation.y = Math.PI / 2; if (dir === 'xz') m.rotation.y = Math.PI / 2; scene.add(m);
+  const w = new THREE.Mesh(new THREE.CylinderGeometry(.006, .006, 1.3), new THREE.MeshBasicMaterial({ color: 0x888888 })); w.position.set(x, 3.25, z); scene.add(w);
+}
+for (const [x, z, dir, txt] of D.signs || []) sign(txt, x, z, dir === 'z' ? 'x' : 'z');
 for (const [txt, x, z] of D.building.labels) {
   if (txt === 'NA') { const s = new THREE.Mesh(new THREE.BoxGeometry(.9, .3, .05), new THREE.MeshBasicMaterial({ color: 0x16A34A })); s.position.set(x, 2.35, z); scene.add(s);
     floorText(['NOTAUSGANG'], x, z + .6, 2.4, '#16A34A'); continue; }
