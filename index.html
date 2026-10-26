@@ -17,6 +17,7 @@ html,body{margin:0;height:100%;overflow:hidden;background:#FBF9F3;font-family:-a
   <button id="walk" class="on">🚶 Rundgang</button>
   <button id="top">🗺 Draufsicht</button>
   <button id="cones" class="on">Sichtfelder</button>
+  <button id="liste">📋 Liste</button>
   <button id="reset">↺ Neustart</button>
   <button id="place">➕ Kamera setzen</button>
   <select id="camsel"><option value="">📷 Kamerablick …</option></select>
@@ -234,7 +235,7 @@ function label(t, col) {
   const s = new THREE.Sprite(new THREE.SpriteMaterial({ map: tx, depthTest: true })); s.scale.set(1.4, .7, 1); s.renderOrder = 9; return s;
 }
 const sel = document.getElementById('camsel');
-for (const c of D.cams) {
+for (const c of (window.PLAN_KAMERAS ? D.cams : [])) {
   const a = c.dir * Math.PI / 180, f = c.fov * Math.PI / 180, N = 20, p = [c.x, c.h, c.z], idx = [];
   for (let i = 0; i <= N; i++) { const t = a - f / 2 + f * i / N; p.push(c.x + Math.cos(t) * c.r, .03, c.z + Math.sin(t) * c.r); }
   for (let i = 1; i <= N; i++) idx.push(0, i, i + 1);
@@ -277,26 +278,30 @@ function frustum(c, color, op) {
   const body = new THREE.Mesh(new THREE.SphereGeometry(.17, 20, 10, 0, Math.PI * 2, Math.PI / 2, Math.PI / 2), new THREE.MeshLambertMaterial({ color: 0xffffff }));
   body.position.copy(o); g.add(body); return g;
 }
-function redrawMine() { mineGroup.clear(); mine.forEach((c, i) => { if (edit !== c) { const f = frustum(c, 0x1E5AC8, .1); mineGroup.add(f); const l = label('E' + (i + 1), '#1E5AC8'); l.position.set(c.x, c.h + .7, c.z); mineGroup.add(l); } }); }
+function redrawMine() { mineGroup.clear(); mine.forEach((c, i) => { if (edit !== c) { const f = frustum(c, 0xD61E28, .12); mineGroup.add(f); const l = label('K' + String(i + 1).padStart(2, '0'), '#D61E28'); l.position.set(c.x, c.h + .7, c.z); mineGroup.add(l); } }); }
 function saveMine() { localStorage.setItem('meineKameras', JSON.stringify(mine)); }
 function fillSel() { [...sel.querySelectorAll('option[data-e]')].forEach(o => o.remove());
-  mine.forEach((c, i) => { const o = document.createElement('option'); o.value = 'E' + i; o.dataset.e = 1; o.textContent = `★ Eigene E${i + 1} · ${String(c.f).replace('.', ',')} mm`; sel.appendChild(o); }); }
+  mine.forEach((c, i) => { const o = document.createElement('option'); o.value = 'E' + i; o.dataset.e = 1; o.textContent = `📷 K${String(i + 1).padStart(2, '0')} · ${String(c.f).replace('.', ',')} mm${c.hk ? ' · hochkant' : ''}`; sel.appendChild(o); }); }
 let editGroup = null;
 const P = id => document.getElementById(id), panel = P('panel'), pip = P('pipbox');
 function syncUI() { if (!edit) return; P('sf').value = edit.f; P('sh').value = edit.h; P('st').value = Math.round(edit.tilt * 180 / Math.PI);
   P('vf').textContent = String(edit.f.toFixed(1)).replace('.', ',') + ' mm'; P('vh').textContent = String(edit.h.toFixed(1)).replace('.', ',') + ' m'; P('vt').textContent = Math.round(edit.tilt * 180 / Math.PI) + '°';
   P('hk').classList.toggle('on', edit.hk); P('pfov').textContent = `${Math.round(edit.hk ? fovV(edit.f) : fovH(edit.f))}° × ${Math.round(edit.hk ? fovH(edit.f) : fovV(edit.f))}°`;
-  if (editGroup) scene.remove(editGroup); editGroup = frustum(edit, 0xD61E28, .16); scene.add(editGroup); }
+  if (editGroup) scene.remove(editGroup); editGroup = frustum(edit, 0xFF7A3D, .2); scene.add(editGroup); }
 function openEdit(c, title) { edit = c; P('ptitle').textContent = title; panel.style.display = 'block'; pip.style.display = 'block'; P('stick').style.bottom = '250px'; setMode('walk'); redrawMine(); syncUI(); }
 function closeEdit() { edit = null; if (editGroup) scene.remove(editGroup); editGroup = null; panel.style.display = 'none'; pip.style.display = 'none'; P('stick').style.bottom = '70px'; redrawMine(); fillSel(); }
-P('place').onclick = () => { const c = { x: px, z: pz, h: 2.8, yaw, tilt: 25 * Math.PI / 180, f: 4, hk: false }; mine.push(c); saveMine(); openEdit(c, 'Neue Kamera E' + mine.length); };
+P('place').onclick = () => { const c = { x: px, z: pz, h: 2.8, yaw, tilt: 25 * Math.PI / 180, f: 4, hk: false }; mine.push(c); saveMine(); openEdit(c, 'Neue Kamera K' + String(mine.length).padStart(2, '0')); };
 P('sf').oninput = e => { edit.f = +e.target.value; syncUI(); }; P('sh').oninput = e => { edit.h = +e.target.value; syncUI(); };
 P('st').oninput = e => { edit.tilt = +e.target.value * Math.PI / 180; syncUI(); };
 P('rl').onclick = () => { edit.yaw -= Math.PI / 36; syncUI(); }; P('rr').onclick = () => { edit.yaw += Math.PI / 36; syncUI(); };
 P('hk').onclick = () => { edit.hk = !edit.hk; syncUI(); }; P('here').onclick = () => { edit.x = px; edit.z = pz; edit.yaw = yaw; syncUI(); };
 P('ok').onclick = () => { saveMine(); closeEdit(); }; P('del').onclick = () => { mine = mine.filter(c => c !== edit); saveMine(); closeEdit(); };
-sel.addEventListener('change', () => { if (String(sel.value).startsWith('E')) { const c = mine[+sel.value.slice(1)]; sel.value = ''; openEdit(c, 'Eigene ' + 'E' + (mine.indexOf(c) + 1)); } }, true);
+sel.addEventListener('change', () => { if (String(sel.value).startsWith('E')) { const c = mine[+sel.value.slice(1)]; sel.value = ''; openEdit(c, 'Kamera K' + String(mine.indexOf(c) + 1).padStart(2, '0')); } }, true);
 for (const id of ['panel', 'place']) for (const ev of ['touchstart', 'mousedown']) P(id).addEventListener(ev, e => e.stopPropagation());
+P('liste').onclick = () => { const r = mine.map((c, i) => { const H = Math.round(c.hk ? fovV(c.f) : fovH(c.f));
+    return `K${String(i + 1).padStart(2, '0')}  x=${c.x.toFixed(1)}  z=${c.z.toFixed(1)}  Höhe ${c.h.toFixed(1)} m  Richtung ${Math.round(((c.yaw * 180 / Math.PI) % 360 + 360) % 360)}°  Neigung ${Math.round(c.tilt * 180 / Math.PI)}°  ${c.f.toFixed(1)} mm  ${H}°${c.hk ? '  hochkant' : ''}`; }).join('\n');
+  const t = `Kameraliste (${mine.length} Stück)\n` + (r || '– noch keine Kamera gesetzt –'); if (navigator.clipboard) navigator.clipboard.writeText(t).catch(() => {}); alert(t + '\n\n(ist kopiert – einfach in den Chat einfügen)'); };
+for (const ev of ['touchstart', 'mousedown']) P('liste').addEventListener(ev, e => e.stopPropagation());
 P('reset').onclick = () => { if (!confirm('Neustart: zurück zum Eingang und eigene Kameras löschen?')) return; localStorage.removeItem('meineKameras'); location.reload(); };
 for (const ev of ['touchstart', 'mousedown']) P('reset').addEventListener(ev, e => e.stopPropagation());
 redrawMine(); fillSel();
