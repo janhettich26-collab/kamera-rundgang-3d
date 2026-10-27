@@ -73,6 +73,26 @@ const woodT = new THREE.CanvasTexture(woodC); woodT.wrapS = woodT.wrapT = THREE.
 const woodMat = new THREE.MeshLambertMaterial({ color: 0xc99a62 }), capMat = new THREE.MeshLambertMaterial({ color: 0xd9d4ca });
 for (const w of D.building.walls) { extrude(w.ext, .12, sockMat, w.holes, 0); extrude(w.ext, 2.58, wallMat, w.holes, .12); extrude(w.ext, 1.26, woodMat, w.holes, 2.7); extrude(w.ext, .04, capMat, w.holes, 3.96); }
 for (const pl of D.building.pillars) { extrude(pl, .12, sockMat, [], 0); extrude(pl, 3.84, new THREE.MeshLambertMaterial({ color: 0xfaf9f6 }), [], .12); }
+// Leichtbauwände (im Plan als dünne Doppellinie) bis unter die Decke
+for (const [x0, z0, x1, z1, y0, y1] of D.lightwalls || []) {
+  const m = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, y1 - y0, z1 - z0), y0 > 0 ? wallMat : wallMat); m.position.set((x0 + x1) / 2, (y0 + y1) / 2, (z0 + z1) / 2); scene.add(m);
+  if (y0 === 0) { const sk = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0 + .01, .12, z1 - z0 + .01), sockMat); sk.position.set((x0 + x1) / 2, .06, (z0 + z1) / 2); scene.add(sk); }
+}
+// Leergutannahme: 2 Automaten in der Wand, Bänder, Sortieranlage, Rollcontainer
+if (D.leergut) {
+  const L = D.leergut, M = c => new THREE.MeshLambertMaterial({ color: c });
+  for (const [x0, z0, x1, z1] of L.automats) {
+    const b = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, 2.05, z1 - z0), M(0xeceef1)); b.position.set((x0 + x1) / 2, 1.025, (z0 + z1) / 2); scene.add(b);
+    const fr = new THREE.Mesh(new THREE.BoxGeometry(.02, 2.05, z1 - z0), M(0x16A34A)); fr.position.set(x0 - .01, 1.025, (z0 + z1) / 2); scene.add(fr);
+    const scr = new THREE.Mesh(new THREE.BoxGeometry(.02, .32, .26), new THREE.MeshBasicMaterial({ color: 0x1b2a3a })); scr.position.set(x0 - .025, 1.45, (z0 + z1) / 2); scene.add(scr);
+    const hole = new THREE.Mesh(new THREE.BoxGeometry(.03, .22, .36), new THREE.MeshBasicMaterial({ color: 0x0b0b0b })); hole.position.set(x0 - .025, 1.0, (z0 + z1) / 2); scene.add(hole);
+  }
+  for (const [x0, z0, x1, z1, h, c] of L.boxes) { const b = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, h, z1 - z0), M(parseInt(c))); b.position.set((x0 + x1) / 2, h / 2, (z0 + z1) / 2); scene.add(b); }
+  for (const [x0, z0, x1, z1] of L.belts) { const fr = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, .85, z1 - z0), M(0x9aa0a8)); fr.position.set((x0 + x1) / 2, .425, (z0 + z1) / 2); scene.add(fr);
+    const bt = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0, .03, z1 - z0 - .1), M(0x1b1d21)); bt.position.set((x0 + x1) / 2, .865, (z0 + z1) / 2); scene.add(bt); }
+  for (const [x0, z0, x1, z1] of L.carts) { for (let i = 0; i < 4; i++) { const k = new THREE.Mesh(new THREE.BoxGeometry(x1 - x0 - .04, .3, z1 - z0 - .04), M([0x1E5AC8, 0x16A34A, 0xcc071e, 0x2b2d33][i]));
+      k.position.set((x0 + x1) / 2, .2 + i * .32, (z0 + z1) / 2); scene.add(k); } }
+}
 // Türen: Zarge + geschlossenes Türblatt mit Griff (Lage aus Bauplan-Bögen)
 const doorMat = new THREE.MeshLambertMaterial({ color: 0xe9e6df }), frameMat = new THREE.MeshLambertMaterial({ color: 0x8c9096 }), handleMat = new THREE.MeshLambertMaterial({ color: 0x3a3d44 });
 for (const [hx, hz, cx, cz, L] of D.building.doors_closed) {
